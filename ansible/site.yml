@@ -1,0 +1,53 @@
+---
+- name: Deploy Cloud-1 stack on AWS server
+  hosts: cloud1
+  become: true
+
+  vars:
+    project_path: /opt/cloud-1
+
+  tasks:
+
+    - name: Update apt
+      apt:
+        update_cache: yes
+
+    - name: Install required dependencies
+      apt:
+        name:
+          - ca-certificates
+          - curl
+          - gnupg
+        state: present
+
+    - name: Install Docker
+      shell: |
+        curl -fsSL https://get.docker.com -o get-docker.sh
+        sh get-docker.sh
+      args:
+        creates: /usr/bin/docker
+
+    - name: Install docker compose plugin
+      apt:
+        name: docker-compose-plugin
+        state: present
+
+    - name: Create project directory
+      file:
+        path: "{{ project_path }}"
+        state: directory
+        mode: "0755"
+
+    - name: Copy project files to server
+      synchronize:
+        src: "{{ playbook_dir }}/.."
+        dest: "{{ project_path }}"
+        delete: no
+        rsync_opts:
+          - "--exclude=.git"
+          - "--exclude=ansible/.venv"
+
+    - name: Start docker compose stack
+      shell: |
+        cd {{ project_path }}
+        docker compose up -d

@@ -1,0 +1,2 @@
+[cloud1]
+51.20.255.123 ansible_user=ubuntu ansible_ssh_private_key_file=~/.ssh/cloud1-key.pem
