@@ -1,0 +1,74 @@
+version: "3.8"                      # Version du format docker-compose
+
+services:                           # Déclaration de tous les services (containers)
+
+  db:                               # Service pour la base de données MariaDB
+    image: mariadb:11               # Image Docker officielle de MariaDB
+    container_name: cloud1-db       # Nom personnalisé du container
+    restart: unless-stopped         # Redémarre automatiquement sauf si stoppé manuellement
+    environment:                    # Variables d'environnement pour configurer MariaDB
+      MYSQL_DATABASE: ${MYSQL_DATABASE}          # Nom de la base WordPress
+      MYSQL_USER: ${MYSQL_USER}                  # Nom de l'utilisateur WordPress
+      MYSQL_PASSWORD: ${MYSQL_PASSWORD}          # Mot de passe utilisateur WordPress
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD} # Mot de passe root MariaDB
+    volumes:                        # Volumes persistants pour stocker les données
+      - db_data:/var/lib/mysql      # Permet de conserver les données SQL même après reboot
+    networks:                       # Réseaux connectés
+      - backend                     # Réseau interne, non exposé au public
+
+  wordpress:                        # Service WordPress (PHP-FPM)
+    image: wordpress:php8.2-fpm     # Image officielle WordPress avec PHP-FPM
+    container_name: cloud1-wordpress # Nom du container
+    restart: unless-stopped         # Redémarre automatiquement
+    environment:                    # Variables pour dire à WordPress comment se connecter à MariaDB
+      WORDPRESS_DB_HOST: db:3306    # Host de la DB (nom du service) + port
+      WORDPRESS_DB_NAME: ${MYSQL_DATABASE}      # Nom de la base
+      WORDPRESS_DB_USER: ${MYSQL_USER}          # User WordPress
+      WORDPRESS_DB_PASSWORD: ${MYSQL_PASSWORD}  # Mot de passe WordPress
+    volumes:
+      - wp_data:/var/www/html       # Stockage des fichiers WordPress persistants
+    depends_on:                     # Démarre après la DB
+      - db
+    networks:
+      - backend                     # Accès au réseau backend (communication interne)
+
+  phpmyadmin:                       # Service phpMyAdmin
+    image: phpmyadmin/phpmyadmin    # Image officielle phpMyAdmin
+    container_name: cloud1-phpmyadmin # Nom du container
+    restart: unless-stopped         # Redémarre automatiquement
+    environment:
+      PMA_HOST: db                  # Host de la DB
+      PMA_USER: ${MYSQL_USER}       # User DB
+      PMA_PASSWORD: ${MYSQL_PASSWORD} # Mot de passe DB
+    depends_on:
+      - db                          # Attend la DB
+    networks:
+      - backend                     # Doit accéder à MariaDB
+      - frontend                    # Doit être accessible par le reverse proxy
+
+  nginx:                            # Service reverse proxy Nginx
+    image: nginx:1.27               # Image officielle Nginx
+    container_name: cloud1-nginx    # Nom du container
+    restart: unless-stopped         # Redémarre automatiquement
+    ports:
+      - "80:80"                     # Expose le port 80 HTTP
+      # - "443:443"                 # Exposition HTTPS (sera ajouté plus tard)
+    volumes:
+      - wp_data:/var/www/html:ro    # Accès en lecture seule aux fichiers WordPress
+      - ./nginx/default.conf:/etc/nginx/conf.d/default.conf:ro # Config Nginx custom
+    depends_on:
+      - wordpress                   # Démarre seulement quand WordPress est ready
+      - phpmyadmin                 # Idem pour phpMyAdmin
+    networks:
+      - frontend                    # Réseau public
+      - backend                     # Doit atteindre WordPress & phpMyAdmin
+
+# Déclaration des volumes persistants
+volumes:
+  db_data:                          # Volume pour MariaDB
+  wp_data:                          # Volume pour WordPress
+
+# Déclaration des réseaux
+networks:
+  frontend:                         # Réseau frontal (exposé à Internet)
+  backend:                          # Réseau interne (sécurisé, pas accessible depuis l’extérieur)
