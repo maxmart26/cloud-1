@@ -82,3 +82,4 @@ This allows the infrastructure to be deployed on **any compatible server** with 
 ```ini
 [cloud1]
 SERVER_IP ansible_user=ubuntu ansible_ssh_private_key_file=~/.ssh/cloud1-key.pem
+# cloud-1
