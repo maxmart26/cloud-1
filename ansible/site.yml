@@ -40,7 +40,7 @@
 
     - name: Copy project files to server
       synchronize:
-        src: "{{ playbook_dir }}/.."
+        src: "{{ playbook_dir | dirname }}"
         dest: "{{ project_path }}"
         delete: no
         rsync_opts:
